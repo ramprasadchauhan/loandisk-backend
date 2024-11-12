@@ -38,8 +38,17 @@ app.use(express.json());
 
 // General Proxy Route for Any API Endpoint
 app.all('/api/*', async (req, res) => {
-    // Build the target URL dynamically by replacing the '/api' part
-    const targetUrl = `https://api-main.loandisk.com${req.originalUrl.replace('/api', '')}`;
+    console.log(`Received request for: ${req.originalUrl}`);
+
+    // URL decode the request path
+    const decodedUrl = decodeURIComponent(req.originalUrl);
+    console.log(decodedUrl)
+
+    // Remove the `/api` prefix and clean up newlines or special characters
+    const cleanUrl = decodedUrl.replace('/api', '').replace(/%0A|%0D/g, '').trim();
+    console.log(`Cleaned URL: ${cleanUrl}`);
+
+    const targetUrl = `https://api-main.loandisk.com${cleanUrl}`;
 
     try {
         // Forward the request to the third-party API
@@ -48,7 +57,6 @@ app.all('/api/*', async (req, res) => {
             headers: {
                 Authorization: `Basic ${auth}`,
                 "Content-Type": "application/json",
-                // Forward any other headers as necessary
             },
             body: req.method === 'POST' || req.method === 'PUT' ? JSON.stringify(req.body) : null, // Forward body if necessary
         });
@@ -62,11 +70,13 @@ app.all('/api/*', async (req, res) => {
         const data = await response.json();
         res.json(data);
     } catch (error) {
-        // Handle errors
         console.error("Error forwarding request:", error);
         res.status(500).json({ error: "An error occurred while processing the request" });
     }
 });
+
+
+
 
 app.listen(3500, () => {
     console.log("Proxy server running on port 3500");
