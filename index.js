@@ -4,6 +4,8 @@ const cors = require('cors');
 const app = express();
 app.use(cors());
 
+app.use(express.json());
+
 
 const auth = process.env.AUTH
 const branchId = process.env.BRANCH_ID
@@ -34,39 +36,31 @@ const publicKey = process.env.PUBLIC_KEY
 //     }
 // });
 
-app.use(express.json());
 
-// General Proxy Route for Any API Endpoint
-app.all('/api/*', async (req, res) => {
-    console.log(`Received request for: ${req.originalUrl}`);
 
-    // URL decode the request path
-    const decodedUrl = decodeURIComponent(req.originalUrl);
-    console.log(decodedUrl)
+app.all('/:resource/*', async (req, res) => {
+    const { resource } = req.params;
+    const urlParts = req.originalUrl.split('/').slice(2); // Remove the resource and leading slash
+    const urlPath = urlParts.join('/'); // Join the remaining parts
 
-    // Remove the `/api` prefix and clean up newlines or special characters
-    const cleanUrl = decodedUrl.replace('/api', '').replace(/%0A|%0D/g, '').trim();
-    console.log(`Cleaned URL: ${cleanUrl}`);
+    const targetUrl = `https://api-main.loandisk.com/${publicKey}/${branchId}/${resource}/${urlPath}`;
 
-    const targetUrl = `https://api-main.loandisk.com${cleanUrl}`;
+    console.log("Forwarding request to:", targetUrl);  // Add logging here
 
     try {
-        // Forward the request to the third-party API
         const response = await fetch(targetUrl, {
-            method: req.method,  // Preserve the HTTP method (GET, POST, etc.)
+            method: req.method,
             headers: {
                 Authorization: `Basic ${auth}`,
                 "Content-Type": "application/json",
             },
-            body: req.method === 'POST' || req.method === 'PUT' ? JSON.stringify(req.body) : null, // Forward body if necessary
+            body: req.method === 'POST' || req.method === 'PUT' ? JSON.stringify(req.body) : null,  // For POST/PUT requests
         });
 
-        // If response is not OK, return error
         if (!response.ok) {
             return res.status(response.status).json({ error: "Failed to fetch data from API" });
         }
 
-        // Parse and send the response from the third-party API
         const data = await response.json();
         res.json(data);
     } catch (error) {
@@ -74,6 +68,7 @@ app.all('/api/*', async (req, res) => {
         res.status(500).json({ error: "An error occurred while processing the request" });
     }
 });
+
 
 
 
